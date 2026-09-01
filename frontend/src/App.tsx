@@ -407,19 +407,127 @@ function pageFromPath(pathname: string): Page {
 
 function AuthLoading() {
   return (
-    <main className="auth-page">
-      <section className="auth-terminal">
-        <div className="brand-lockup">
+    <main className="signup-layout">
+      <div className="signup-left">
+        <div className="signup-brand-bar">
           <div className="brand-mark">Q</div>
-          <div>
-            <strong>Quantro</strong>
-            <span>Loading authenticated session</span>
+          <div className="signup-brand-text">
+            <span className="signup-brand-name">QUANTRO</span>
           </div>
         </div>
-        <div className="skeleton-stack"><span /><span /><span /></div>
-      </section>
+        <div className="signup-left-content">
+          <div className="skeleton-stack"><span /><span /><span /></div>
+        </div>
+      </div>
+      <div className="signup-right">
+        <section className="signup-form-panel">
+          <div className="skeleton-stack"><span /><span /><span /></div>
+        </section>
+      </div>
     </main>
   );
+}
+
+function SignupBackgroundCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animFrame: number | null = null;
+    let disposed = false;
+
+    const lines: { points: number[]; speed: number; yBase: number; color: string; width: number }[] = [
+      { points: [], speed: 0.3, yBase: 0.35, color: "rgba(59, 130, 246, 0.12)", width: 1 },
+      { points: [], speed: 0.22, yBase: 0.45, color: "rgba(23, 178, 106, 0.08)", width: 0.8 },
+      { points: [], speed: 0.18, yBase: 0.55, color: "rgba(59, 130, 246, 0.06)", width: 0.6 },
+    ];
+
+    function seedLines(w: number) {
+      for (const line of lines) {
+        line.points = [];
+        for (let x = 0; x <= w; x += 3) {
+          line.points.push(line.yBase + Math.sin(x * 0.008 + line.speed * 10) * 0.06 + Math.sin(x * 0.003) * 0.03);
+        }
+      }
+    }
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas!.getBoundingClientRect();
+      canvas!.width = rect.width * dpr;
+      canvas!.height = rect.height * dpr;
+      ctx!.scale(dpr, dpr);
+      seedLines(rect.width);
+    }
+
+    resize();
+    window.addEventListener("resize", resize);
+
+    let offset = 0;
+    function draw() {
+      if (disposed) return;
+      const w = canvas!.getBoundingClientRect().width;
+      const h = canvas!.getBoundingClientRect().height;
+      ctx!.clearRect(0, 0, w, h);
+
+      for (const line of lines) {
+        ctx!.beginPath();
+        offset += line.speed * 0.15;
+        for (let i = 0; i < line.points.length; i++) {
+          const x = i * 3;
+          const y = (line.points[i] + Math.sin((i + offset) * 0.012) * 0.015) * h;
+          if (i === 0) ctx!.moveTo(x, y);
+          else ctx!.lineTo(x, y);
+        }
+        ctx!.strokeStyle = line.color;
+        ctx!.lineWidth = line.width;
+        ctx!.stroke();
+
+        // subtle dots at peaks
+        for (let i = 0; i < line.points.length; i += 40) {
+          const x = i * 3;
+          const y = (line.points[i] + Math.sin((i + offset) * 0.012) * 0.015) * h;
+          ctx!.beginPath();
+          ctx!.arc(x, y, 1.2, 0, Math.PI * 2);
+          ctx!.fillStyle = line.color;
+          ctx!.fill();
+        }
+      }
+
+      // faint horizontal grid
+      ctx!.strokeStyle = "rgba(32, 41, 57, 0.3)";
+      ctx!.lineWidth = 0.5;
+      for (let y = 0; y < h; y += 60) {
+        ctx!.beginPath();
+        ctx!.moveTo(0, y);
+        ctx!.lineTo(w, y);
+        ctx!.stroke();
+      }
+
+      // faint vertical grid
+      for (let x = 0; x < w; x += 80) {
+        ctx!.beginPath();
+        ctx!.moveTo(x, 0);
+        ctx!.lineTo(x, h);
+        ctx!.stroke();
+      }
+
+      animFrame = window.requestAnimationFrame(draw);
+    }
+    draw();
+
+    return () => {
+      disposed = true;
+      if (animFrame !== null) window.cancelAnimationFrame(animFrame);
+      window.removeEventListener("resize", resize);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="signup-bg-canvas" aria-hidden="true" />;
 }
 
 function AuthScreen({ onAuthenticated, onToast, notice, allowSandbox }: {
@@ -428,7 +536,9 @@ function AuthScreen({ onAuthenticated, onToast, notice, allowSandbox }: {
   notice: string | null;
   allowSandbox: boolean;
 }) {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup">(
+    () => window.location.pathname === "/signup" ? "signup" : "login",
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -473,44 +583,147 @@ function AuthScreen({ onAuthenticated, onToast, notice, allowSandbox }: {
     }
   }
 
+  const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
   return (
-    <main className="auth-page">
-      <section className="auth-terminal">
-        <div className="brand-lockup">
-          <div className="brand-mark">Q</div>
-          <div>
-            <strong>Quantro</strong>
-            <span>Institutional crypto execution sandbox</span>
+    <main className="signup-layout">
+      <div className="signup-left">
+        {!prefersReducedMotion && <SignupBackgroundCanvas />}
+        <div className="signup-left-content">
+          <div className="signup-brand-bar">
+            <div className="brand-mark">Q</div>
+            <div className="signup-brand-text">
+              <span className="signup-brand-name">QUANTRO</span>
+              <span className="signup-brand-sub">AI-NATIVE TRADING INFRASTRUCTURE</span>
+            </div>
+          </div>
+
+          <div className="signup-hero">
+            <h1 className="signup-headline">Intelligence meets execution.</h1>
+            <p className="signup-subhead">Build, test, and execute strategies through deterministic trading infrastructure.</p>
+          </div>
+
+          <div className="signup-status-area">
+            <div className="signup-status-row">
+              <span className="signup-status-label">MARKET DATA</span>
+              <span className="signup-status-value"><span className="signup-status-dot live" />LIVE</span>
+            </div>
+            <div className="signup-status-row">
+              <span className="signup-status-label">RISK ENGINE</span>
+              <span className="signup-status-value"><span className="signup-status-dot ready" />READY</span>
+            </div>
+            <div className="signup-status-row">
+              <span className="signup-status-label">EXECUTION</span>
+              <span className="signup-status-value"><span className="signup-status-dot" />PAPER</span>
+            </div>
+            <div className="signup-status-row">
+              <span className="signup-status-label">NETWORK</span>
+              <span className="signup-status-value"><span className="signup-status-dot ready" />SOLANA</span>
+            </div>
           </div>
         </div>
-        {notice && <div className="auth-notice">{notice}</div>}
-        <div className="auth-copy">
-          <p>Trading infrastructure for order routing, portfolio state, and deterministic execution.</p>
-        </div>
-        <form className="auth-form" onSubmit={submit}>
-          <div className="segmented">
-            <button type="button" className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>LOGIN</button>
-            <button type="button" className={mode === "signup" ? "active" : ""} onClick={() => setMode("signup")}>SIGN UP</button>
+      </div>
+
+      <div className="signup-right">
+        <div className="signup-form-panel">
+          <div className="signup-form-header">
+            <div className="brand-mark small">Q</div>
+            <h2 className="signup-form-title">Create your Quantro account</h2>
+            <p className="signup-form-subtitle">Start with a paper trading environment built for AI-native strategies.</p>
           </div>
-          {mode === "signup" && (
-            <label>
-              Name
-              <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" />
+
+          {notice && <div className="signup-notice">{notice}</div>}
+
+          <div className="signup-mode-toggle">
+            <button
+              type="button"
+              className={mode === "login" ? "active" : ""}
+              onClick={() => { setMode("login"); setError(null); }}
+            >
+              LOGIN
+            </button>
+            <button
+              type="button"
+              className={mode === "signup" ? "active" : ""}
+              onClick={() => { setMode("signup"); setError(null); }}
+            >
+              SIGN UP
+            </button>
+          </div>
+
+          <form className="signup-form" onSubmit={submit}>
+            {mode === "signup" && (
+              <label className="signup-field">
+                <span className="signup-label">NAME</span>
+                <input
+                  className="signup-input"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  autoComplete="name"
+                  placeholder="Your full name"
+                />
+              </label>
+            )}
+            <label className="signup-field">
+              <span className="signup-label">EMAIL</span>
+              <input
+                className="signup-input"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                type="email"
+                autoComplete="email"
+                placeholder="you@company.com"
+              />
             </label>
-          )}
-          <label>
-            Email
-            <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" />
-          </label>
-          <label>
-            Password
-            <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} />
-          </label>
-          {error && <div className="form-error">{error}</div>}
-          <button className="primary-action" type="submit" disabled={loading}>{loading ? "AUTHENTICATING" : mode === "login" ? "LOGIN" : "CREATE ACCOUNT"}</button>
-          {allowSandbox && <button className="ghost-action" type="button" onClick={startSandbox} disabled={loading}>START SANDBOX ACCOUNT</button>}
-        </form>
-      </section>
+            <label className="signup-field">
+              <span className="signup-label">PASSWORD</span>
+              <input
+                className="signup-input"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                type="password"
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                placeholder="Minimum 6 characters"
+              />
+            </label>
+
+            {error && <div className="signup-error">{error}</div>}
+
+            <button
+              className="signup-cta"
+              type="submit"
+              disabled={loading}
+            >
+              {loading ? (
+                <span className="signup-cta-loading">
+                  <span className="signup-spinner" />
+                  {mode === "login" ? "AUTHENTICATING..." : "CREATING ACCOUNT..."}
+                </span>
+              ) : (
+                mode === "login" ? "LOGIN" : "CREATE ACCOUNT"
+              )}
+            </button>
+
+            {allowSandbox && (
+              <button
+                className="signup-sandbox-btn"
+                type="button"
+                onClick={startSandbox}
+                disabled={loading}
+              >
+                START SANDBOX ACCOUNT
+              </button>
+            )}
+          </form>
+
+          <div className="signup-form-footer">
+            {mode === "login"
+              ? <span>Don&apos;t have an account? <button type="button" onClick={() => { setMode("signup"); setError(null); }}>Create one</button></span>
+              : <span>Already have an account? <button type="button" onClick={() => { setMode("login"); setError(null); }}>Sign in</button></span>
+            }
+          </div>
+        </div>
+      </div>
     </main>
   );
 }
